@@ -20,17 +20,6 @@ PROXYCURL_API_KEY = os.getenv('PROXYCURL_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 
-import requests
-
-def check_quota(api_key):
-    headers = {"Authorization": f"Bearer {api_key}"}
-    response = requests.get("https://api.openai.com/v1/dashboard/billing/credit_grants", headers=headers)
-    return response.json()
-
-quota_info = check_quota(OPENAI_API_KEY)
-print(quota_info)
-
-
 def get_linkedin_profile(linkedin_url):
    """Fetch LinkedIn profile data using ProxyCurl API"""
    api_endpoint = 'https://nubela.co/proxycurl/api/v2/linkedin'
