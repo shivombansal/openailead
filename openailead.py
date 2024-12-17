@@ -14,9 +14,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-
 # Initialize clients and database
 db = TinyDB('data/leads_db.json')
 leads_table = db.table('leads')
