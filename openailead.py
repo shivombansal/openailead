@@ -210,19 +210,6 @@ def main():
         st.session_state.results = None
         st.success("All data cleared successfully!")
 
-def check_api_keys():
-    """Check if API keys are properly configured"""
-    missing_keys = []
-    if not os.getenv('TAVILY_API_KEY'):
-        missing_keys.append("TAVILY_API_KEY")
-    if not os.getenv('OPENAI_API_KEY'):
-        missing_keys.append("OPENAI_API_KEY")
-    
-    if missing_keys:
-        st.error(f"Missing API keys: {', '.join(missing_keys)}")
-        st.info("Please set these environment variables in a .env file or through your system configuration.")
-        return False
-    return True
 
 if __name__ == "__main__":
     if check_api_keys():
