@@ -1,7 +1,6 @@
 import streamlit as st
 import os
 import logging
-from dotenv import load_dotenv
 from datetime import datetime
 from tinydb import TinyDB
 from tavily import TavilyClient
