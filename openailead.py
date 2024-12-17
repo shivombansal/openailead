@@ -77,7 +77,7 @@ def generate_outreach_email(company_data: dict) -> str:
     """Generate a personalized outreach email using LLM"""
     try:
         prompt = f"""
-        Generate a personalized cold outreach email based on this company information:
+        Generate a personalized cold outreach email from "blueoceansteels" based on the given company information:
         
         Company: {company_data.get('title')}
         Description: {company_data.get('content')}
@@ -96,7 +96,7 @@ def generate_outreach_email(company_data: dict) -> str:
         response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
+            temperature=0.85
         )
         
         logger.info(f"Successfully generated email for {company_data.get('title')}")
