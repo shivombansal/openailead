@@ -21,8 +21,8 @@ load_dotenv()
 # Initialize clients and database
 db = TinyDB('data/leads_db.json')
 leads_table = db.table('leads')
-tavily_client = TavilyClient(api_key=os.getenv('TAVILY_API_KEY'))
-openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+tavily_client = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
+openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def search_tavily_leads(keyword: str, country: str = "India") -> dict:
     """Search companies using Tavily API with advanced parameters"""
