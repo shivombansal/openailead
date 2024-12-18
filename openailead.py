@@ -67,7 +67,7 @@ def summarize_leads(results: dict) -> str:
             return "Error: Could not initialize OpenAI client"
         
         # Limit the number of results to reduce token count
-        limited_results = results.get('results', [])[:5]  # Limit to first 5 results
+        limited_results = results.get('results', [])[:10]  # Limit to first 10 results
         
         # Truncate content for each result to reduce token usage
         truncated_results = []
