@@ -212,5 +212,4 @@ def main():
 
 
 if __name__ == "__main__":
-    if check_api_keys():
-        main()
+    main()
