@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from tinydb import TinyDB
 from tavily import TavilyClient
-import openai
+from openai import OpenAI
 import json
 
 # Configure logging
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 db = TinyDB('data/leads_db.json')
 leads_table = db.table('leads')
 tavily_client = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def search_tavily_leads(keyword: str, country: str = "India") -> dict:
     """Search companies using Tavily API with advanced parameters."""
@@ -57,7 +57,7 @@ def summarize_leads(results: dict) -> str:
         Format as a clear, readable markdown list.
         """
         
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a professional assistant summarizing search results."},
@@ -66,12 +66,11 @@ def summarize_leads(results: dict) -> str:
             temperature=0.7
         )
         
-        return response["choices"][0]["message"]["content"]
+        return response.choices[0].message.content
         
     except Exception as e:
         logger.error(f"Error generating summary: {str(e)}")
         return f"Error generating summary: {str(e)}"
-
 
 def generate_outreach_email(company_data: dict) -> str:
     """Generate a personalized outreach email using LLM."""
@@ -93,7 +92,7 @@ def generate_outreach_email(company_data: dict) -> str:
         Format the email with subject line and body.
         """
         
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are an assistant that writes professional emails."},
@@ -102,7 +101,7 @@ def generate_outreach_email(company_data: dict) -> str:
             temperature=0.85
         )
         
-        return response["choices"][0]["message"]["content"]
+        return response.choices[0].message.content
         
     except Exception as e:
         logger.error(f"Error generating email: {str(e)}")
