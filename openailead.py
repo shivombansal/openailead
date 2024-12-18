@@ -59,15 +59,19 @@ def summarize_leads(results: dict) -> str:
         
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "You are a professional assistant summarizing search results."},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.7
         )
         
-        return response.choices[0].message.content
+        return response["choices"][0]["message"]["content"]
         
     except Exception as e:
         logger.error(f"Error generating summary: {str(e)}")
         return f"Error generating summary: {str(e)}"
+
 
 def generate_outreach_email(company_data: dict) -> str:
     """Generate a personalized outreach email using LLM."""
@@ -91,12 +95,14 @@ def generate_outreach_email(company_data: dict) -> str:
         
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "You are an assistant that writes professional emails."},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.85
         )
         
-        logger.info(f"Successfully generated email for {company_data.get('title')}")
-        return response.choices[0].message.content
+        return response["choices"][0]["message"]["content"]
         
     except Exception as e:
         logger.error(f"Error generating email: {str(e)}")
