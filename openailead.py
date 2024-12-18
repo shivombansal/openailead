@@ -63,36 +63,52 @@ def summarize_leads(results: dict) -> str:
         # Get client inside the function
         client = get_openai_client()
         
-        content = json.dumps(results.get('results', []), indent=2)
+        if client is None:
+            return "Error: Could not initialize OpenAI client"
+        
+        # Limit the number of results to reduce token count
+        limited_results = results.get('results', [])[:5]  # Limit to first 5 results
+        
+        # Truncate content for each result to reduce token usage
+        truncated_results = []
+        for result in limited_results:
+            truncated_result = {
+                'title': result.get('title', '')[:200],  # Limit title length
+                'content': result.get('content', '')[:500],  # Limit description length
+                'url': result.get('url', '')
+            }
+            truncated_results.append(truncated_result)
+        
+        content = json.dumps(truncated_results, indent=2)
         
         prompt = f"""
-        Analyze these company search results and provide a concise summary for each company:
+        Analyze these top company search results and provide a concise summary:
         
         {content}
         
-        For each company, provide:
+        For each company, briefly provide:
         1. Company name
-        2. Key business areas
+        2. Key business area
         3. Potential opportunity
-        4. Relevance score analysis
         
-        Format as a clear, readable markdown list.
+        Format as a clear, readable markdown list. Keep it very concise.
         """
         
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a professional assistant summarizing search results."},
+                {"role": "system", "content": "You are a professional assistant summarizing search results. Be extremely concise."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7
+            temperature=0.7,
+            max_tokens=1000  # Limit the response tokens
         )
         
         return response.choices[0].message.content
         
     except Exception as e:
-        logger.error(f"Error generating summary: {str(e)}")
-        return f"Error generating summary: {str(e)}"
+        st.error(f"Error generating summary: {e}")
+        return f"Error generating summary: {e}"
 
 def generate_outreach_email(company_data: dict) -> str:
     """Generate a personalized outreach email using LLM."""
