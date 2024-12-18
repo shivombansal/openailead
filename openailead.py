@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 db = TinyDB('data/leads_db.json')
 leads_table = db.table('leads')
 tavily_client = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
-openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+openai_client = openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 def search_tavily_leads(keyword: str, country: str = "India") -> dict:
     """Search companies using Tavily API with advanced parameters"""
@@ -57,7 +57,7 @@ def summarize_leads(results: dict) -> str:
         Format as a clear, readable markdown list.
         """
         
-        response = openai_client.chat.completions.create(
+        response = openai_client.ChatCompletion.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
@@ -89,7 +89,7 @@ def generate_outreach_email(company_data: dict) -> str:
         Format the email with subject line and body.
         """
         
-        response = openai_client.chat.completions.create(
+        response = openai_client.ChatCompletion.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.85
