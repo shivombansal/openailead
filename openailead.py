@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from tinydb import TinyDB
 from tavily import TavilyClient
-from openai import OpenAI
+import openai
 import json
 
 # Configure logging
