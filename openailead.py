@@ -1,134 +1,208 @@
 import streamlit as st
 import os
-from dotenv import load_dotenv
-import requests
-from litellm import completion
+import logging
 from datetime import datetime
-from tinydb import TinyDB, Query
+from tinydb import TinyDB
+from tavily import TavilyClient
+from openai import OpenAI
 import json
 
-# Load environment variables
-load_dotenv()
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Initialize database
+# Initialize clients and database
 db = TinyDB('data/leads_db.json')
 leads_table = db.table('leads')
-prompts_table = db.table('prompts')
+tavily_client = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# Configure API keys
-PROXYCURL_API_KEY = os.getenv('PROXYCURL_API_KEY')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+def search_tavily_leads(keyword: str, country: str = "India") -> dict:
+    """Search companies using Tavily API with advanced parameters."""
+    try:
+        results = tavily_client.search(
+            query=f"{keyword} companies in {country}",
+            search_depth="advanced",
+            include_answer=True,
+            include_raw_content=True,
+            max_results=10
+        )
+        
+        logger.info(f"Successfully fetched {len(results.get('results', []))} results for keyword: {keyword}")
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error in Tavily search: {str(e)}")
+        return {"results": [], "error": str(e)}
 
+def summarize_leads(results: dict) -> str:
+    """Generate a summary of the search results using LLM."""
+    try:
+        content = json.dumps(results.get('results', []), indent=2)
+        
+        prompt = f"""
+        Analyze these company search results and provide a concise summary for each company:
+        
+        {content}
+        
+        For each company, provide:
+        1. Company name
+        2. Key business areas
+        3. Potential opportunity
+        4. Relevance score analysis
+        
+        Format as a clear, readable markdown list.
+        """
+        
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a professional assistant summarizing search results."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        logger.error(f"Error generating summary: {str(e)}")
+        return f"Error generating summary: {str(e)}"
 
-import requests
+def generate_outreach_email(company_data: dict) -> str:
+    """Generate a personalized outreach email using LLM."""
+    try:
+        prompt = f"""
+        Generate a personalized cold outreach email from "blueoceansteels" based on the given company information:
+        
+        Company: {company_data.get('title')}
+        Description: {company_data.get('content')}
+        URL: {company_data.get('url')}
+        
+        Requirements:
+        1. Keep it under 150 words
+        2. Focus on value proposition
+        3. Include a clear call to action
+        4. Be professional but conversational
+        5. Reference specific company details
+        
+        Format the email with subject line and body.
+        """
+        
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an assistant that writes professional emails."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.85
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        logger.error(f"Error generating email: {str(e)}")
+        return f"Error generating email: {str(e)}"
 
-def check_quota(api_key):
-    headers = {"Authorization": f"Bearer {api_key}"}
-    response = requests.get("https://api.openai.com/v1/dashboard/billing/credit_grants", headers=headers)
-    return response.json()
-
-quota_info = check_quota(OPENAI_API_KEY)
-print(quota_info)
-
-
-def get_linkedin_profile(linkedin_url):
-   """Fetch LinkedIn profile data using ProxyCurl API"""
-   api_endpoint = 'https://nubela.co/proxycurl/api/v2/linkedin'
-   headers = {'Authorization': f'Bearer {PROXYCURL_API_KEY}'}
-   params = {
-       'url': linkedin_url,
-       'use_cache': 'if-present',
-   }
-  
-   response = requests.get(api_endpoint, params=params, headers=headers)
-   if response.status_code == 200:
-       return response.json()
-   return None
-
-def analyze_lead(profile_data):
-   """Analyze lead using OpenAI API through LiteLLM"""
-   prompt = f"""
-   Analyze the following LinkedIn profile data and categorize the lead as HOT, WARM, or COLD.
-   Also provide a brief explanation and a personalized outreach message.
-  
-   Profile Data:
-   {json.dumps(profile_data, indent=2)}
-  
-   Provide response in the following JSON format:
-   {{
-       "category": "HOT/WARM/COLD",
-       "explanation": "Brief explanation",
-       "outreach_message": "Personalized message"
-   }}
-   """
-  
-   response = completion(
-       model="gpt-3.5-turbo",
-       messages=[{"role": "user", "content": prompt}],
-       api_key=OPENAI_API_KEY
-   )
-  
-   return json.loads(response.choices[0].message.content)
-
-def save_lead(profile_data, analysis):
-   """Save lead information to database"""
-   lead_data = {
-       'profile': profile_data,
-       'analysis': analysis,
-       'timestamp': datetime.now().isoformat()
-   }
-   leads_table.insert(lead_data)
-   return lead_data
+def save_lead(lead_data: dict) -> dict:
+    """Save lead information to the database."""
+    try:
+        lead_entry = {
+            'details': lead_data,
+            'timestamp': datetime.now().isoformat()
+        }
+        leads_table.insert(lead_entry)
+        logger.info(f"Successfully saved lead: {lead_data.get('title')}")
+        return lead_entry
+        
+    except Exception as e:
+        logger.error(f"Error saving lead: {str(e)}")
+        return {"error": str(e)}
 
 def main():
-   st.title("🎯 Lead Generation AI")
-  
-   # Sidebar for viewing saved leads
-   with st.sidebar:
-       st.header("Saved Leads")
-       if st.button("View All Leads"):
-           all_leads = leads_table.all()
-           for lead in all_leads:
-               st.write("---")
-               st.write(f"**Timestamp:** {lead['timestamp']}")
-               st.write(f"**Category:** {lead['analysis']['category']}")
-               with st.expander("View Details"):
-                   st.json(lead)
-  
-   # Main content
-   linkedin_url = st.text_input("Enter LinkedIn Profile URL")
-  
-   if st.button("Analyze Lead"):
-       with st.spinner("Fetching profile data..."):
-           profile_data = get_linkedin_profile(linkedin_url)
-          
-           if profile_data:
-               st.success("Profile data fetched successfully!")
-              
-               with st.spinner("Analyzing lead..."):
-                   analysis = analyze_lead(profile_data)
-                  
-                   # Display results
-                   st.header("Analysis Results")
-                  
-                   category_color = {
-                       "HOT": "🔴",
-                       "WARM": "🟡",
-                       "COLD": "🔵"
-                   }
-                  
-                   st.subheader(f"Lead Category: {category_color.get(analysis['category'], '⚪')} {analysis['category']}")
-                   st.write(f"**Explanation:** {analysis['explanation']}")
-                  
-                   st.text_area("Suggested Outreach Message", analysis['outreach_message'], height=200)
-                  
-                   # Save lead
-                   save_lead(profile_data, analysis)
-                   st.success("Lead information saved to database!")
-           else:
-               st.error("Failed to fetch profile data. Please check the URL and try again.")
+    st.title("Lead Generator Pro")
+    
+    # Initialize session state
+    if 'results' not in st.session_state:
+        st.session_state.results = None
+    if 'generated_emails' not in st.session_state:
+        st.session_state.generated_emails = {}
+    if 'saved_leads' not in st.session_state:
+        st.session_state.saved_leads = set()
+
+    # Sidebar for saved leads
+    with st.sidebar:
+        st.header("📋 Saved Leads")
+        if st.button("View All Leads"):
+            all_leads = leads_table.all()
+            st.dataframe(
+                [{"Title": lead['details'].get('title', 'N/A'), 
+                  "Score": lead['details'].get('score', 'N/A'),
+                  "Date": lead['timestamp']} for lead in all_leads]
+            )
+    
+    # Main content
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        keyword = st.text_input("🔍 Enter Keywords to Search Companies", "")
+    with col2:
+        country = st.selectbox("🌍 Select Country", ["India", "USA", "UK", "Singapore"])
+    
+    # Search button
+    if st.button("🚀 Find Leads"):
+        if not keyword:
+            st.error("Please enter a keyword to search.")
+            return
+
+        with st.spinner("Searching for companies..."):
+            st.session_state.results = search_tavily_leads(keyword, country)
+            
+            if st.session_state.results.get('results'):
+                with st.spinner("Analyzing results..."):
+                    summary = summarize_leads(st.session_state.results)
+                    st.markdown(summary)
+            else:
+                st.error("No results found.")
+
+    # Display results if available
+    if st.session_state.results and st.session_state.results.get('results'):
+        st.subheader("📊 Detailed Results")
+        for idx, company in enumerate(st.session_state.results['results']):
+            with st.expander(f"🏢 {company.get('title', 'Company')}"):
+                st.write(f"**Relevance Score:** {company.get('score', 'N/A')}")
+                st.write(f"**URL:** [{company.get('url')}]({company.get('url')})")
+                st.write(f"**Description:** {company.get('content')}")
+                
+                email_key = f"email_{idx}"
+                save_key = f"save_{idx}"
+                
+                col1, col2 = st.columns([1, 1])
+                
+                with col1:
+                    if st.button("📧 Generate Email", key=email_key):
+                        email = generate_outreach_email(company)
+                        st.session_state.generated_emails[email_key] = email
+                
+                with col2:
+                    if st.button("💾 Save Lead", key=save_key):
+                        save_lead(company)
+                        st.session_state.saved_leads.add(save_key)
+                        st.success("Lead saved successfully!")
+
+                # Display generated email
+                if email_key in st.session_state.generated_emails:
+                    st.markdown("### Generated Email:")
+                    st.markdown(st.session_state.generated_emails[email_key])
+
+    # Clear all button
+    if st.button("🗑️ Clear All"):
+        leads_table.truncate()
+        st.session_state.clear()
+        st.success("All data cleared successfully!")
 
 
 if __name__ == "__main__":
-       main()
-       
+    main()
