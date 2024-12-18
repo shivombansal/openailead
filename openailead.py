@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from tinydb import TinyDB
 from tavily import TavilyClient
-from openai import OpenAI
+import openai
 import json
 
 # Configure logging
@@ -18,12 +18,8 @@ logger = logging.getLogger(__name__)
 db = TinyDB('data/leads_db.json')
 leads_table = db.table('leads')
 tavily_client = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
-client = OpenAI(
-    api_key=st.secrets["OPENAI_API_KEY"],
-    # Add these lines to handle potential proxy issues
-    http_client=None,  # Use default HTTP client
-    proxies=None,      # Explicitly set no proxies
-)
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+client = openai.OpenAI()
 
 def search_tavily_leads(keyword: str, country: str = "India") -> dict:
     """Search companies using Tavily API with advanced parameters."""
