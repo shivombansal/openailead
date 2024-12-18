@@ -22,9 +22,20 @@ leads_table = db.table('leads')
 tavily_client = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
 
 
+import httpx
+
 def get_openai_client():
-    """Create and return an OpenAI client."""
-    return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    """Create and return an OpenAI client with explicit configuration."""
+    try:
+        client = OpenAI(
+            api_key=st.secrets["OPENAI_API_KEY"],
+            # Explicitly set http_client to avoid proxy issues
+            http_client=httpx.Client()
+        )
+        return client
+    except Exception as e:
+        st.error(f"Error initializing OpenAI client: {e}")
+        return None
     
 
 def search_tavily_leads(keyword: str, country: str = "India") -> dict:
