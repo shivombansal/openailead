@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 db = TinyDB('data/leads_db.json')
 leads_table = db.table('leads')
 tavily_client = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
-openai_client = openai.api_key = st.secrets["OPENAI_API_KEY"]
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 def search_tavily_leads(keyword: str, country: str = "India") -> dict:
-    """Search companies using Tavily API with advanced parameters"""
+    """Search companies using Tavily API with advanced parameters."""
     try:
         results = tavily_client.search(
             query=f"{keyword} companies in {country}",
@@ -39,7 +39,7 @@ def search_tavily_leads(keyword: str, country: str = "India") -> dict:
         return {"results": [], "error": str(e)}
 
 def summarize_leads(results: dict) -> str:
-    """Generate a summary of the search results using LLM"""
+    """Generate a summary of the search results using LLM."""
     try:
         content = json.dumps(results.get('results', []), indent=2)
         
@@ -57,8 +57,8 @@ def summarize_leads(results: dict) -> str:
         Format as a clear, readable markdown list.
         """
         
-        response = openai_client.ChatCompletion.create(
-            model="gpt-4o",
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
@@ -70,7 +70,7 @@ def summarize_leads(results: dict) -> str:
         return f"Error generating summary: {str(e)}"
 
 def generate_outreach_email(company_data: dict) -> str:
-    """Generate a personalized outreach email using LLM"""
+    """Generate a personalized outreach email using LLM."""
     try:
         prompt = f"""
         Generate a personalized cold outreach email from "blueoceansteels" based on the given company information:
@@ -89,8 +89,8 @@ def generate_outreach_email(company_data: dict) -> str:
         Format the email with subject line and body.
         """
         
-        response = openai_client.ChatCompletion.create(
-            model="gpt-4o",
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.85
         )
@@ -103,7 +103,7 @@ def generate_outreach_email(company_data: dict) -> str:
         return f"Error generating email: {str(e)}"
 
 def save_lead(lead_data: dict) -> dict:
-    """Save lead information to the database"""
+    """Save lead information to the database."""
     try:
         lead_entry = {
             'details': lead_data,
@@ -134,13 +134,13 @@ def main():
         if st.button("View All Leads"):
             all_leads = leads_table.all()
             st.dataframe(
-                [{"Title": lead['details'].get('title'), 
+                [{"Title": lead['details'].get('title', 'N/A'), 
                   "Score": lead['details'].get('score', 'N/A'),
                   "Date": lead['timestamp']} for lead in all_leads]
             )
     
     # Main content
-    col1, col2 = st.columns([2,1])
+    col1, col2 = st.columns([2, 1])
     with col1:
         keyword = st.text_input("🔍 Enter Keywords to Search Companies", "")
     with col2:
@@ -149,21 +149,19 @@ def main():
     # Search button
     if st.button("🚀 Find Leads"):
         if not keyword:
-            st.error("Please enter a keyword to search")
+            st.error("Please enter a keyword to search.")
             return
 
         with st.spinner("Searching for companies..."):
             st.session_state.results = search_tavily_leads(keyword, country)
             
             if st.session_state.results.get('results'):
-                # Generate and display summary
                 with st.spinner("Analyzing results..."):
-                    try:
-                        summary = summarize_leads(st.session_state.results)
-                        st.markdown(summary)
-                    except Exception as e:
-                        st.error(f"Error generating summary: {str(e)}")
-    
+                    summary = summarize_leads(st.session_state.results)
+                    st.markdown(summary)
+            else:
+                st.error("No results found.")
+
     # Display results if available
     if st.session_state.results and st.session_state.results.get('results'):
         st.subheader("📊 Detailed Results")
@@ -173,41 +171,31 @@ def main():
                 st.write(f"**URL:** [{company.get('url')}]({company.get('url')})")
                 st.write(f"**Description:** {company.get('content')}")
                 
-                # Create unique keys for each company's buttons
                 email_key = f"email_{idx}"
                 save_key = f"save_{idx}"
                 
-                col1, col2 = st.columns([1,1])
+                col1, col2 = st.columns([1, 1])
                 
                 with col1:
-                    def generate_email_callback(company=company, key=email_key):
+                    if st.button("📧 Generate Email", key=email_key):
                         email = generate_outreach_email(company)
-                        st.session_state.generated_emails[key] = email
-                    
-                    st.button("📧 Generate Email", key=email_key, on_click=generate_email_callback)
+                        st.session_state.generated_emails[email_key] = email
                 
                 with col2:
-                    def save_lead_callback(company=company, key=save_key):
+                    if st.button("💾 Save Lead", key=save_key):
                         save_lead(company)
-                        st.session_state.saved_leads.add(key)
-                    
-                    st.button("💾 Save Lead", key=save_key, on_click=save_lead_callback)
-                
+                        st.session_state.saved_leads.add(save_key)
+                        st.success("Lead saved successfully!")
+
                 # Display generated email
                 if email_key in st.session_state.generated_emails:
                     st.markdown("### Generated Email:")
                     st.markdown(st.session_state.generated_emails[email_key])
-                
-                # Show save confirmation
-                if save_key in st.session_state.saved_leads:
-                    st.success("Lead saved successfully!")
 
     # Clear all button
     if st.button("🗑️ Clear All"):
         leads_table.truncate()
-        st.session_state.generated_emails.clear()
-        st.session_state.saved_leads.clear()
-        st.session_state.results = None
+        st.session_state.clear()
         st.success("All data cleared successfully!")
 
 
