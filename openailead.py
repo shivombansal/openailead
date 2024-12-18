@@ -6,6 +6,8 @@ from tinydb import TinyDB
 from tavily import TavilyClient
 import openai
 import json
+from openai import OpenAI
+
 
 # Configure logging
 logging.basicConfig(
@@ -18,8 +20,12 @@ logger = logging.getLogger(__name__)
 db = TinyDB('data/leads_db.json')
 leads_table = db.table('leads')
 tavily_client = TavilyClient(api_key=st.secrets["TAVILY_API_KEY"])
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-client = openai.OpenAI()
+
+
+def get_openai_client():
+    """Create and return an OpenAI client."""
+    return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    
 
 def search_tavily_leads(keyword: str, country: str = "India") -> dict:
     """Search companies using Tavily API with advanced parameters."""
@@ -39,9 +45,13 @@ def search_tavily_leads(keyword: str, country: str = "India") -> dict:
         logger.error(f"Error in Tavily search: {str(e)}")
         return {"results": [], "error": str(e)}
 
+
 def summarize_leads(results: dict) -> str:
     """Generate a summary of the search results using LLM."""
     try:
+        # Get client inside the function
+        client = get_openai_client()
+        
         content = json.dumps(results.get('results', []), indent=2)
         
         prompt = f"""
@@ -76,6 +86,9 @@ def summarize_leads(results: dict) -> str:
 def generate_outreach_email(company_data: dict) -> str:
     """Generate a personalized outreach email using LLM."""
     try:
+        # Get client inside the function
+        client = get_openai_client()
+        
         prompt = f"""
         Generate a personalized cold outreach email from "blueoceansteels" based on the given company information:
         
@@ -107,7 +120,7 @@ def generate_outreach_email(company_data: dict) -> str:
     except Exception as e:
         logger.error(f"Error generating email: {str(e)}")
         return f"Error generating email: {str(e)}"
-
+        
 
 def save_lead(lead_data: dict) -> dict:
     """Save lead information to the database."""
